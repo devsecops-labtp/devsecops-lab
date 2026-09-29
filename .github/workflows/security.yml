@@ -77,9 +77,9 @@ jobs:
         run: docker logs app | tail -50
 
   gate:
-    name: Quality gate (la version corrigée doit être propre)
+    name: Quality gate (la version corrigee doit etre propre)
     needs: [sast-semgrep]
     runs-on: ubuntu-latest
     steps:
-      - run:  |
-      "Semgrep sur 'fixed' doit remonter 0 alerte, sinon le job sast-semgrep (fixed) a échoué."
+      - run: |
+          echo "Semgrep sur fixed doit remonter 0 alerte, sinon le job sast-semgrep fixed a echoue."
