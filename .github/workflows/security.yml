@@ -81,4 +81,5 @@ jobs:
     needs: [sast-semgrep]
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Semgrep sur 'fixed' : 0 alerte, sinon le job sast-semgrep (fixed) a échoué."
+      - run:  |
+      "Semgrep sur 'fixed' doit remonter 0 alerte, sinon le job sast-semgrep (fixed) a échoué."
