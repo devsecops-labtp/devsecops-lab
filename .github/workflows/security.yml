@@ -1,0 +1,84 @@
+name: DevSecOps pipeline
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write   # upload SARIF vers l'onglet Security
+
+jobs:
+  sast-semgrep:
+    name: SAST (Semgrep) - ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [vulnerable, fixed]
+    # La version vulnérable DOIT échouer : on garde le rapport sans casser le run global
+    continue-on-error: ${{ matrix.target == 'vulnerable' }}
+    container: semgrep/semgrep:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep (règles maison + OWASP Top 10)
+        run: |
+          semgrep scan ${{ matrix.target }} \
+            --config .semgrep/rules.yml --config p/owasp-top-ten --config p/python \
+            --sarif --output semgrep-${{ matrix.target }}.sarif \
+            --error            # exit 1 si au moins une alerte
+      - name: Upload artefact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-${{ matrix.target }}
+          path: semgrep-${{ matrix.target }}.sarif
+      - name: Upload SARIF (onglet Security)
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep-${{ matrix.target }}.sarif
+          category: semgrep-${{ matrix.target }}
+
+  dast-zap:
+    name: DAST (ZAP) - ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [vulnerable, fixed]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build + run l'appli
+        run: |
+          docker build -t app-${{ matrix.target }} ${{ matrix.target }}
+          docker run -d --name app -p 5000:5000 -e SECRET_KEY=ci-only-secret app-${{ matrix.target }}
+          for i in $(seq 1 20); do curl -sf localhost:5000/ && break || sleep 2; done
+      - name: ZAP baseline (scan passif)
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: http://localhost:5000
+          rules_file_name: zap/rules.tsv
+          allow_issue_writing: false
+          artifact_name: zap-baseline-${{ matrix.target }}
+          fail_action: false
+      - name: ZAP full scan (scan actif) - uniquement sur main / manuel
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        uses: zaproxy/action-full-scan@v0.12.0
+        with:
+          target: http://localhost:5000
+          rules_file_name: zap/rules.tsv
+          allow_issue_writing: false
+          artifact_name: zap-full-${{ matrix.target }}
+          fail_action: false
+      - name: Logs appli
+        if: always()
+        run: docker logs app | tail -50
+
+  gate:
+    name: Quality gate (la version corrigée doit être propre)
+    needs: [sast-semgrep]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Semgrep sur 'fixed' : 0 alerte, sinon le job sast-semgrep (fixed) a échoué."

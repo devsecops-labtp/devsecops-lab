@@ -1,0 +1,47 @@
+rules:
+  - id: flask-sqli-string-format
+    languages: [python]
+    severity: ERROR
+    message: "Requête SQL construite par concaténation/formatage (injection SQL, CWE-89). Utiliser des paramètres ?."
+    metadata: {cwe: "CWE-89", owasp: "A03:2021 Injection", stride: "Tampering / Elevation of privilege"}
+    pattern-either:
+      - pattern: $DB.execute($Q % ...)
+      - pattern: $DB.execute($Q + ...)
+      - pattern: |
+          $Q = "..." % (...)
+          ...
+          $DB.execute($Q)
+      - pattern: |
+          $Q = $STR % (...)
+          ...
+          $X.execute($Q)
+  - id: flask-command-injection
+    languages: [python]
+    severity: ERROR
+    message: "subprocess avec shell=True (injection de commande, CWE-78). Utiliser une liste d'arguments."
+    metadata: {cwe: "CWE-78", owasp: "A03:2021 Injection", stride: "Elevation of privilege"}
+    pattern: subprocess.$F(..., shell=True, ...)
+  - id: flask-ssti-xss
+    languages: [python]
+    severity: ERROR
+    message: "render_template_string avec contenu concaténé (XSS/SSTI, CWE-79/1336)."
+    metadata: {cwe: "CWE-79", owasp: "A03:2021 Injection", stride: "Tampering / Information disclosure"}
+    pattern: render_template_string("..." + ...)
+  - id: flask-hardcoded-secret-key
+    languages: [python]
+    severity: ERROR
+    message: "secret_key en dur (CWE-798). Lire depuis une variable d'environnement."
+    metadata: {cwe: "CWE-798", owasp: "A02:2021 Cryptographic Failures", stride: "Spoofing / Information disclosure"}
+    pattern: $APP.secret_key = "..."
+  - id: flask-debug-true
+    languages: [python]
+    severity: WARNING
+    message: "debug=True expose la console Werkzeug (CWE-489)."
+    metadata: {cwe: "CWE-489", owasp: "A05:2021 Security Misconfiguration", stride: "Information disclosure / EoP"}
+    pattern: $APP.run(..., debug=True, ...)
+  - id: weak-hash-md5
+    languages: [python]
+    severity: WARNING
+    message: "MD5 pour des mots de passe (CWE-328). Utiliser scrypt/bcrypt/argon2 (werkzeug.security)."
+    metadata: {cwe: "CWE-328", owasp: "A02:2021 Cryptographic Failures", stride: "Information disclosure"}
+    pattern: hashlib.md5(...)

@@ -1,0 +1,30 @@
+### VULNERABLE (port 5000)
+-- SQLi login bypass:
+Bienvenue admin'--
+-- XSS:
+<h2>Résultats pour <script>alert(1)</script></h2>
+-- SSTI {{7*7}}:
+
+-- IDOR /notes/1 sans login:
+Note confidentielle admin
+-- Cmd injection:
+uid=0(root) gid=0(root) groups=0(root)
+
+-- Admin ?admin=1:
+Panneau admin
+
+### FIXED (port 5001)
+-- SQLi:
+401
+-- XSS:
+<h2>Résultats pour &lt;script&gt;alert(1)&lt;/script&gt;</h2>
+-- IDOR sans login:
+401
+-- Cmd injection sans login:
+401
+-- Admin ?admin=1:
+401
+-- Headers:
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Content-Security-Policy: default-src 'self'
